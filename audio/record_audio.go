@@ -7,9 +7,9 @@ import (
 	"github.com/gordonklaus/portaudio"
 )
 
-const FrameSize = 64
+const FrameSize = 512
 
-type Frame = []float32
+type Frame = []float64
 
 type RecordingOptions struct {
 	SampleRate float64
@@ -32,12 +32,17 @@ func RecordAudio(ctx context.Context, options RecordingOptions) (<-chan Frame, e
 			}
 		}()
 
+		frame := make([]float64, FrameSize)
+
 		handleAudioInput := func(in [][]float32, timeInfo portaudio.StreamCallbackTimeInfo, flags portaudio.StreamCallbackFlags) {
 			if len(in) != 1 {
 				panic(errors.New(fmt.Sprintf("received an unexpected number of input channels, expected %d but got %d", 1, len(in))))
 			}
 
-			frame := in[0]
+			for i, sample := range in[0] {
+				frame[i] = float64(sample)
+			}
+
 			frameChan <- frame
 		}
 
