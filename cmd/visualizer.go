@@ -6,9 +6,12 @@ import (
 	"github.com/faiface/pixel/imdraw"
 	"github.com/faiface/pixel/pixelgl"
 	"github.com/strangedev/audiolight/audio"
+	"github.com/strangedev/audiolight/dsp"
 	"golang.org/x/image/colornames"
+	"math"
 	"os"
 	"os/signal"
+	"time"
 )
 
 const w, h = float64(1024), float64(512)
@@ -29,33 +32,41 @@ func run() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
 	defer stop()
 
-	recordingOptions := audio.RecordingOptions{SampleRate: 44100}
-	frameChan, err := audio.RecordAudio(ctx, recordingOptions)
+	recordingOptions := audio.RecordingOptions{
+		SampleRate: 10000,
+		FrameSize:  128,
+	}
+
+	audioFrames, err := audio.RecordAudio(ctx, recordingOptions)
 	if err != nil {
 		panic(err)
 	}
 
-	fftChan, err := audio.FFT(ctx, frameChan)
-	if err != nil {
-		panic(err)
-	}
-	fftInterpreter := audio.NewFFTInterpreter(recordingOptions)
+	fftFrames := dsp.FFT(ctx, audioFrames, recordingOptions.FrameSize)
+	downsampledFFTFrames := dsp.Downsample(ctx, fftFrames, recordingOptions.FrameSize, 4)
+	pressureMatchedFFTFrames := dsp.DropFramesDynamically(ctx, downsampledFFTFrames)
 
-	for frame := range fftChan {
-		if win.Closed() {
-			break
-		}
+	fftInterpreter := dsp.NewFFTInterpreter(recordingOptions)
+	binCount := fftInterpreter.GetBinCount()
 
+	ticker := time.NewTicker(20 * time.Millisecond)
+
+	for !win.Closed() {
+		<-ticker.C
+
+		imd.Clear()
 		win.Clear(colornames.Aliceblue)
+
+		frame := <-pressureMatchedFFTFrames
 
 		for i, frequencyContent := range fftInterpreter.GetFrequencyContent(frame) {
 			imd.Color = colornames.Limegreen
 
-			x := w / float64(len(frame)) * float64(i)
-			y := frequencyContent.Intensity
+			x := w / float64(binCount) * float64(i)
+			y := math.Log(1+frequencyContent.Intensity*10) * h
 
 			imd.Push(pixel.V(x, y))
-			imd.Circle(2, 2)
+			imd.Circle(3, 6)
 		}
 
 		imd.Draw(win)

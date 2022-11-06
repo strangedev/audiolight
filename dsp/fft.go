@@ -1,15 +1,16 @@
-package audio
+package dsp
 
 import (
 	"context"
 	"github.com/mjibson/go-dsp/dsputils"
 	"github.com/mjibson/go-dsp/fft"
+	"github.com/strangedev/audiolight/audio"
 	"math/cmplx"
 )
 
-type FFTFrame = []complex128
+type FFTFrame = []float64
 
-func FFT(ctx context.Context, in <-chan Frame) (<-chan FFTFrame, error) {
+func FFT(ctx context.Context, in <-chan audio.Frame, frameSize int) <-chan FFTFrame {
 	out := make(chan FFTFrame, 16)
 
 	go func() {
@@ -21,23 +22,26 @@ func FFT(ctx context.Context, in <-chan Frame) (<-chan FFTFrame, error) {
 				return
 			case frame := <-in:
 				fftResult := fft.FFT(dsputils.ToComplex(frame))
+				fftFrame := make(FFTFrame, frameSize)
 
-				out <- fftResult
+				for i, value := range fftResult {
+					fftFrame[i] = cmplx.Abs(value)
+				}
+
+				out <- fftFrame
 			}
 		}
 	}()
 
-	return out, nil
+	return out
 }
 
 type FFTInterpreter struct {
-	sampleRate float64
+	audio.RecordingOptions
 }
 
-func NewFFTInterpreter(options RecordingOptions) FFTInterpreter {
-	return FFTInterpreter{
-		sampleRate: options.SampleRate,
-	}
+func NewFFTInterpreter(options audio.RecordingOptions) FFTInterpreter {
+	return FFTInterpreter{options}
 }
 
 type FrequencyContent struct {
@@ -50,10 +54,14 @@ func (interpreter FFTInterpreter) GetFrequencyContent(frame FFTFrame) []Frequenc
 
 	for i, value := range frame {
 		result[i] = FrequencyContent{
-			Frequency: float64(i) * interpreter.sampleRate / FrameSize,
-			Intensity: cmplx.Abs(value),
+			Frequency: float64(i) * interpreter.SampleRate / float64(interpreter.FrameSize),
+			Intensity: value,
 		}
 	}
 
 	return result
+}
+
+func (interpreter FFTInterpreter) GetBinCount() int {
+	return interpreter.FrameSize / 2
 }
