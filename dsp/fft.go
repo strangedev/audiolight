@@ -22,10 +22,10 @@ func FFT(ctx context.Context, in <-chan audio.Frame, frameSize int) <-chan FFTFr
 				return
 			case frame := <-in:
 				fftResult := fft.FFT(dsputils.ToComplex(frame))
-				fftFrame := make(FFTFrame, frameSize)
+				fftFrame := make(FFTFrame, frameSize/2)
 
-				for i, value := range fftResult {
-					fftFrame[i] = cmplx.Abs(value)
+				for i := range fftFrame {
+					fftFrame[i] = cmplx.Abs(fftResult[i])
 				}
 
 				out <- fftFrame
