@@ -2,13 +2,12 @@ package dsp
 
 import (
 	"context"
-	"github.com/strangedev/audiolight/math"
 )
 
 // DropFramesDynamically matches the flow rate of an input stream to the capacity of the output stream by dropping frames.
 // When the output stream is blocked, frames are dropped from the input stream. When the output stream becomes unblocked,
 // the most recently received input frame is sent to the output stream.
-func DropFramesDynamically[TSample math.Number](ctx context.Context, in <-chan []TSample) <-chan []TSample {
+func DropFramesDynamically[TSample any](ctx context.Context, in <-chan []TSample) <-chan []TSample {
 	out := make(chan []TSample, 1)
 
 	go func() {

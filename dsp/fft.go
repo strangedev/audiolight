@@ -49,6 +49,10 @@ type FrequencyContent struct {
 	Intensity float64
 }
 
+func (interpreter FFTInterpreter) GetFFTBinFrequency(binIndex int) float64 {
+	return float64(binIndex) * interpreter.SampleRate / float64(interpreter.FrameSize)
+}
+
 func (interpreter FFTInterpreter) GetFrequencyContent(frame FFTFrame) []FrequencyContent {
 	result := make([]FrequencyContent, len(frame))
 

@@ -14,7 +14,6 @@ func Downsample[TSample math.Number](ctx context.Context, in <-chan []TSample, f
 		defer close(out)
 
 		accumulatorFrame := make([]TSample, frameSize)
-		outFrame := make([]TSample, frameSize)
 		inFrameCounter := 0
 
 		for {
@@ -31,6 +30,7 @@ func Downsample[TSample math.Number](ctx context.Context, in <-chan []TSample, f
 				inFrameCounter++
 
 				if inFrameCounter == reductionRate {
+					outFrame := make([]TSample, frameSize)
 					copy(outFrame, accumulatorFrame)
 					out <- outFrame
 

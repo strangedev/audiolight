@@ -33,8 +33,8 @@ func run() {
 	defer stop()
 
 	recordingOptions := audio.RecordingOptions{
-		SampleRate: 10000,
-		FrameSize:  128,
+		SampleRate: 44100,
+		FrameSize:  256,
 	}
 
 	audioFrames, err := audio.RecordAudio(ctx, recordingOptions)
@@ -43,11 +43,14 @@ func run() {
 	}
 
 	fftFrames := dsp.FFT(ctx, audioFrames, recordingOptions.FrameSize)
-	downsampledFFTFrames := dsp.Downsample(ctx, fftFrames, recordingOptions.FrameSize, 4)
-	pressureMatchedFFTFrames := dsp.DropFramesDynamically(ctx, downsampledFFTFrames)
+	downsampledFFTFrames := dsp.Downsample(ctx, fftFrames, recordingOptions.FrameSize, 1)
 
-	fftInterpreter := dsp.NewFFTInterpreter(recordingOptions)
-	binCount := fftInterpreter.GetBinCount()
+	spectralAnalysisOptions := dsp.NewSpectralIntensityAnalysisOptions(recordingOptions).
+		AddBand("bass", 10, 100).
+		AddBand("middle", 100, 500).
+		AddBand("treble", 500, 5000)
+	intensityFrames := dsp.AnalyseSpectralIntensity(ctx, downsampledFFTFrames, spectralAnalysisOptions)
+	pressureMatchedIntensityFrames := dsp.DropFramesDynamically(ctx, intensityFrames)
 
 	ticker := time.NewTicker(20 * time.Millisecond)
 
@@ -57,13 +60,13 @@ func run() {
 		imd.Clear()
 		win.Clear(colornames.Aliceblue)
 
-		frame := <-pressureMatchedFFTFrames
+		frame := <-pressureMatchedIntensityFrames
 
-		for i, frequencyContent := range fftInterpreter.GetFrequencyContent(frame) {
+		for iBand, bandIntensity := range frame {
 			imd.Color = colornames.Limegreen
 
-			x := w / float64(binCount) * float64(i)
-			y := math.Log(1+frequencyContent.Intensity*10) * h
+			x := w / float64(len(spectralAnalysisOptions.Bands)) * float64(iBand)
+			y := math.Log(1+bandIntensity.Intensity*10) * h
 
 			imd.Push(pixel.V(x, y))
 			imd.Circle(3, 6)
